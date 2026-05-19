@@ -1,0 +1,36 @@
+{% extends "tracker/base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} · Time Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1 class="h4 mb-0">{{ title }}</h1>
+        </div>
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="d-flex justify-content-between mt-3">
+                        {% if entry %}
+                            <a class="btn btn-outline-danger" href="{% url 'tracker:timeentry_delete' entry.id %}">
+                                <i class="bi bi-trash me-1"></i>Delete
+                            </a>
+                        {% else %}<span></span>{% endif %}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check2 me-1"></i>Save Entry
+                        </button>
+                    </div>
+                </form>
+                <hr>
+                <p class="text-muted small mb-0">
+                    Tip: you can also use the live timer from the dashboard for hands-free tracking.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

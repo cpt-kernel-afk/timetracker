@@ -1,0 +1,21 @@
+{% extends "tracker/base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-danger shadow-sm">
+            <div class="card-body">
+                <h1 class="h4 text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Delete project?</h1>
+                <p>You are about to delete the project <strong>{{ project.name }}</strong>.
+                   This will also delete <strong>{{ project.entries.count }}</strong> time entries.
+                   This action cannot be undone.</p>
+                <form method="post" class="d-flex gap-2 justify-content-end">
+                    {% csrf_token %}
+                    <a class="btn btn-outline-secondary" href="{% url 'tracker:project_detail' project.id %}">Cancel</a>
+                    <button type="submit" class="btn btn-danger">Yes, delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

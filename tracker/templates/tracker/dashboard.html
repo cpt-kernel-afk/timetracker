@@ -1,0 +1,153 @@
+{% extends "tracker/base.html" %}
+{% load static %}
+
+{% block title %}Dashboard · Time Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Dashboard</h1>
+    <small class="text-muted">{{ today|date:"l, F j, Y" }}</small>
+</div>
+
+{% if running %}
+    {% for entry in running %}
+    <div class="card border-success mb-4 shadow-sm">
+        <div class="card-body d-flex flex-wrap align-items-center gap-3">
+            <div class="flex-grow-1">
+                <div class="text-uppercase small text-success fw-semibold">
+                    <span class="pulse-dot"></span> Running
+                </div>
+                <div class="fs-4 fw-semibold">
+                    <span class="badge rounded-circle me-2" style="background:{{ entry.project.color }};width:14px;height:14px;"></span>
+                    {{ entry.project.name }}
+                </div>
+                <div class="text-muted">Started {{ entry.start_time|time:"H:i" }} ·
+                    <span class="js-timer" data-start="{{ entry.start_time|date:'c' }}">{{ entry.duration_display }}</span>
+                </div>
+            </div>
+            <form method="post" action="{% url 'tracker:timer_stop' entry.id %}" class="d-flex gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'tracker:dashboard' %}">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-stop-circle me-1"></i>Stop & Save
+                </button>
+            </form>
+            <form method="post" action="{% url 'tracker:timer_cancel' entry.id %}" onsubmit="return confirm('Discard this running timer?');">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'tracker:dashboard' %}">
+                <button type="submit" class="btn btn-outline-danger" title="Discard">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+{% endif %}
+
+<h2 class="h5 text-muted mb-3">Projects</h2>
+{% if project_stats %}
+    <div class="row g-3 mb-4">
+        {% for stat in project_stats %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="rounded-circle me-2" style="display:inline-block;background:{{ stat.project.color }};width:14px;height:14px;"></span>
+                        <a href="{% url 'tracker:project_detail' stat.project.id %}" class="text-decoration-none text-reset fw-semibold">
+                            {{ stat.project.name }}
+                        </a>
+                    </div>
+                    <div class="row text-center small mb-3">
+                        <div class="col"><div class="text-muted">Today</div><strong>{{ stat.today_h }}h</strong></div>
+                        <div class="col"><div class="text-muted">Week</div><strong>{{ stat.week_h }}h</strong></div>
+                        <div class="col"><div class="text-muted">Month</div><strong>{{ stat.month_h }}h</strong></div>
+                    </div>
+                    {% if stat.active_timer %}
+                        <form method="post" action="{% url 'tracker:timer_stop' stat.active_timer.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{% url 'tracker:dashboard' %}">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="bi bi-stop-circle me-1"></i>Stop Timer
+                            </button>
+                        </form>
+                    {% else %}
+                        <form method="post" action="{% url 'tracker:timer_start' stat.project.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{% url 'tracker:dashboard' %}">
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                <i class="bi bi-play-circle me-1"></i>Start Timer
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-info">
+        No projects yet. <a href="{% url 'tracker:project_create' %}" class="alert-link">Create your first project</a>.
+    </div>
+{% endif %}
+
+<h2 class="h5 text-muted mb-3">Recent entries</h2>
+{% if recent_entries %}
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th><th>Project</th><th>Time</th><th>Duration</th><th>Description</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in recent_entries %}
+                <tr>
+                    <td>{{ entry.date|date:"Y-m-d" }}</td>
+                    <td>
+                        <span class="rounded-circle me-1" style="display:inline-block;background:{{ entry.project.color }};width:10px;height:10px;"></span>
+                        {{ entry.project.name }}
+                    </td>
+                    <td class="text-muted">
+                        {% if entry.start_time %}{{ entry.start_time|time:"H:i" }}–{{ entry.end_time|time:"H:i" }}{% else %}—{% endif %}
+                    </td>
+                    <td><strong>{{ entry.duration_display }}</strong></td>
+                    <td class="text-truncate" style="max-width:300px;">{{ entry.description|default:"—" }}</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:timeentry_update' entry.id %}">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+    <p class="text-muted">No time entries yet.</p>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Live tick for running timers
+(function () {
+    function fmt(ms) {
+        var totalSec = Math.floor(ms / 1000);
+        var h = Math.floor(totalSec / 3600);
+        var m = Math.floor((totalSec % 3600) / 60);
+        var s = totalSec % 60;
+        return h + "h " + String(m).padStart(2, "0") + "m " + String(s).padStart(2, "0") + "s";
+    }
+    function tick() {
+        document.querySelectorAll(".js-timer").forEach(function (el) {
+            var start = new Date(el.dataset.start);
+            el.textContent = fmt(Date.now() - start.getTime());
+        });
+    }
+    setInterval(tick, 1000);
+    tick();
+})();
+</script>
+{% endblock %}

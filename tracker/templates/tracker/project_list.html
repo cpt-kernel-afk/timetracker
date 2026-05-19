@@ -1,0 +1,81 @@
+{% extends "tracker/base.html" %}
+
+{% block title %}Projects · Time Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Projects</h1>
+    <div class="d-flex gap-2">
+        {% if show_archived %}
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'tracker:project_list' %}">
+                <i class="bi bi-eye-slash"></i> Hide archived
+            </a>
+        {% else %}
+            <a class="btn btn-outline-secondary btn-sm" href="?archived=1">
+                <i class="bi bi-archive"></i> Show archived
+            </a>
+        {% endif %}
+        <a class="btn btn-primary" href="{% url 'tracker:project_create' %}">
+            <i class="bi bi-plus-lg me-1"></i>New Project
+        </a>
+    </div>
+</div>
+
+{% if projects %}
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th></th>
+                    <th>Name</th>
+                    <th>Total logged</th>
+                    <th>Hourly rate</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for project in projects %}
+                <tr>
+                    <td style="width:30px;">
+                        <span class="rounded-circle" style="display:inline-block;background:{{ project.color }};width:14px;height:14px;"></span>
+                    </td>
+                    <td>
+                        <a href="{% url 'tracker:project_detail' project.id %}" class="fw-semibold text-decoration-none">
+                            {{ project.name }}
+                        </a>
+                        {% if project.description %}
+                            <div class="text-muted small">{{ project.description|truncatechars:80 }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% with mins=project.total_minutes_db|default:0 %}
+                            {{ mins|floatformat:0 }} min
+                        {% endwith %}
+                    </td>
+                    <td>{% if project.hourly_rate %}{{ project.hourly_rate }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                    <td>
+                        {% if project.is_archived %}
+                            <span class="badge bg-secondary">Archived</span>
+                        {% else %}
+                            <span class="badge bg-success">Active</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:project_update' project.id %}">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+    <div class="alert alert-info">
+        No projects yet. <a href="{% url 'tracker:project_create' %}" class="alert-link">Create one</a>.
+    </div>
+{% endif %}
+{% endblock %}

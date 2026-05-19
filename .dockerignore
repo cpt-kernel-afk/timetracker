@@ -1,0 +1,37 @@
+# VCS
+.git/
+.gitignore
+.github/
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Python cruft
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Django local artefacts
+*.sqlite3
+staticfiles/
+media/
+test_settings.py
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Docs / dev-only files (not needed in the running container)
+docs/
+CONTRIBUTING.md
+SECURITY.md
+CHANGELOG.md
+AUTHORS
+
+# Tests don't need to ship in the image (kept anyway since they're tiny — uncomment to exclude)
+# tracker/tests.py

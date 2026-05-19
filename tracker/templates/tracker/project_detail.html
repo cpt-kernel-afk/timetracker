@@ -1,0 +1,93 @@
+{% extends "tracker/base.html" %}
+
+{% block title %}{{ project.name }} · Time Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
+    <div>
+        <div class="d-flex align-items-center mb-1">
+            <span class="rounded-circle me-2" style="display:inline-block;background:{{ project.color }};width:18px;height:18px;"></span>
+            <h1 class="h3 mb-0">{{ project.name }}</h1>
+            {% if project.is_archived %}<span class="badge bg-secondary ms-2">Archived</span>{% endif %}
+        </div>
+        {% if project.description %}<p class="text-muted mb-0">{{ project.description }}</p>{% endif %}
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="{% url 'tracker:project_update' project.id %}">
+            <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+        <a class="btn btn-primary" href="{% url 'tracker:timeentry_create' %}?project={{ project.id }}">
+            <i class="bi bi-plus-lg me-1"></i>Log Time
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Total time</div>
+                <div class="fs-3 fw-semibold">{{ total_hours }}h</div>
+                <div class="text-muted small">{{ total_minutes }} minutes</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Hourly rate</div>
+                <div class="fs-3 fw-semibold">
+                    {% if project.hourly_rate %}{{ project.hourly_rate }}{% else %}<span class="text-muted">—</span>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Estimated cost</div>
+                <div class="fs-3 fw-semibold">
+                    {% if total_cost is not None %}{{ total_cost }}{% else %}<span class="text-muted">—</span>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h2 class="h5 mb-3">Time entries</h2>
+{% if entries %}
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr><th>Date</th><th>Time</th><th>Duration</th><th>Description</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for entry in entries %}
+                <tr {% if entry.is_running %}class="table-success"{% endif %}>
+                    <td>{{ entry.date|date:"Y-m-d" }}</td>
+                    <td class="text-muted">
+                        {% if entry.start_time %}{{ entry.start_time|time:"H:i" }}–{% if entry.end_time %}{{ entry.end_time|time:"H:i" }}{% else %}<em>running</em>{% endif %}{% else %}—{% endif %}
+                    </td>
+                    <td><strong>{{ entry.duration_display }}</strong></td>
+                    <td>{{ entry.description|default:"—" }}</td>
+                    <td class="text-end">
+                        {% if not entry.is_running %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:timeentry_update' entry.id %}">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a class="btn btn-sm btn-outline-danger" href="{% url 'tracker:timeentry_delete' entry.id %}">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+    <p class="text-muted">No time entries yet.</p>
+{% endif %}
+{% endblock %}

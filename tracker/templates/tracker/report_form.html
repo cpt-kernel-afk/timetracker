@@ -1,0 +1,60 @@
+{% extends "tracker/base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}Report · Time Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <h1 class="h3 mb-4"><i class="bi bi-file-earmark-pdf me-2"></i>Generate Report</h1>
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="get" novalidate>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">From</label>
+                            {{ form.date_from }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">To</label>
+                            {{ form.date_to }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Projects</label>
+                            {% if form.projects.field.queryset %}
+                                <div class="border rounded p-3" style="max-height:240px;overflow:auto;">
+                                {% for choice in form.projects %}
+                                    <div class="form-check">{{ choice.tag }}
+                                        <label class="form-check-label" for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+                                    </div>
+                                {% endfor %}
+                                </div>
+                                <div class="form-text">Leave all unchecked to include every project.</div>
+                            {% else %}
+                                <p class="text-muted">No projects exist yet.</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ form.include_archived }}
+                                <label class="form-check-label" for="{{ form.include_archived.id_for_label }}">
+                                    Include archived projects
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button type="submit" formaction="{% url 'tracker:report_csv' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-filetype-csv me-1"></i>Download CSV
+                        </button>
+                        <button type="submit" formaction="{% url 'tracker:report_pdf' %}" formtarget="_blank" class="btn btn-primary">
+                            <i class="bi bi-filetype-pdf me-1"></i>Generate PDF
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

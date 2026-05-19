@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Time Tracker Report</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm 1.8cm 2.5cm 1.8cm;
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-family: Helvetica, Arial, sans-serif;
+                font-size: 9pt;
+                color: #888;
+            }
+        }
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 10pt;
+            color: #222;
+            line-height: 1.4;
+        }
+        h1 {
+            font-size: 20pt;
+            margin: 0 0 0.2em 0;
+            color: #0d6efd;
+        }
+        h2 {
+            font-size: 13pt;
+            margin: 1.4em 0 0.5em 0;
+            padding-bottom: 4px;
+            border-bottom: 2px solid #0d6efd;
+            page-break-after: avoid;
+        }
+        .meta {
+            color: #666;
+            font-size: 9pt;
+            margin-bottom: 2em;
+        }
+        .meta span { margin-right: 1.5em; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 0.5em;
+            page-break-inside: auto;
+        }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
+        th, td {
+            text-align: left;
+            padding: 5px 8px;
+            border-bottom: 1px solid #e3e3e3;
+            vertical-align: top;
+        }
+        th {
+            background: #f4f6f8;
+            font-size: 9pt;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #555;
+        }
+        td.num, th.num { text-align: right; white-space: nowrap; }
+        .project-block { page-break-inside: avoid; margin-bottom: 1.5em; }
+        .project-header {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5em;
+        }
+        .color-dot {
+            display: inline-block;
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+        .totals-row {
+            font-weight: bold;
+            background: #f9fafc;
+        }
+        .grand-total {
+            margin-top: 2em;
+            padding: 1em;
+            background: #0d6efd;
+            color: white;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            page-break-inside: avoid;
+        }
+        .grand-total .label { text-transform: uppercase; font-size: 10pt; letter-spacing: 0.05em; }
+        .grand-total .value { font-size: 18pt; font-weight: bold; }
+        .empty { color: #888; font-style: italic; padding: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Time Tracker Report</h1>
+    <div class="meta">
+        {% if date_from or date_to %}
+            <span><strong>Period:</strong>
+                {% if date_from %}{{ date_from|date:"Y-m-d" }}{% else %}beginning{% endif %}
+                &rarr;
+                {% if date_to %}{{ date_to|date:"Y-m-d" }}{% else %}today{% endif %}
+            </span>
+        {% else %}
+            <span><strong>Period:</strong> all time</span>
+        {% endif %}
+        <span><strong>Generated:</strong> {{ generated_at|date:"Y-m-d H:i" }}</span>
+    </div>
+
+    {% for block in project_blocks %}
+        <div class="project-block">
+            <h2>
+                <span class="color-dot" style="background:{{ block.project.color }};"></span>
+                {{ block.project.name }}
+                {% if block.project.is_archived %}<small style="color:#999;font-weight:normal;">(archived)</small>{% endif %}
+            </h2>
+            {% if block.entries %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:14%">Date</th>
+                            <th style="width:18%">Time</th>
+                            <th>Description</th>
+                            <th class="num" style="width:12%">Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in block.entries %}
+                        <tr>
+                            <td>{{ entry.date|date:"Y-m-d" }}</td>
+                            <td>
+                                {% if entry.start_time %}{{ entry.start_time|time:"H:i" }}–{{ entry.end_time|time:"H:i" }}{% else %}—{% endif %}
+                            </td>
+                            <td>{{ entry.description|default:"—" }}</td>
+                            <td class="num">{{ entry.duration_minutes }} min</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="totals-row">
+                            <td colspan="3">Total · {{ block.project.name }}</td>
+                            <td class="num">{{ block.total_hours }} h ({{ block.total_minutes }} min)</td>
+                        </tr>
+                        {% if block.cost is not None %}
+                        <tr class="totals-row">
+                            <td colspan="3">Cost @ {{ block.project.hourly_rate }} / h</td>
+                            <td class="num">{{ block.cost }}</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="empty">No time entries in the selected period.</p>
+            {% endif %}
+        </div>
+    {% empty %}
+        <p class="empty">No projects to report.</p>
+    {% endfor %}
+
+    <div class="grand-total">
+        <div>
+            <div class="label">Grand Total</div>
+            <div style="opacity:0.85;font-size:9pt;">across {{ project_blocks|length }} project{{ project_blocks|length|pluralize }}</div>
+        </div>
+        <div style="text-align:right;">
+            <div class="value">{{ grand_total_hours }} h</div>
+            <div style="opacity:0.85;font-size:9pt;">{{ grand_total_minutes }} minutes
+                {% if grand_total_cost is not None %} · {{ grand_total_cost }} total cost{% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
