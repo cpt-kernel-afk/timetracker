@@ -24,7 +24,6 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 
-
 HEX_COLOR_VALIDATOR = RegexValidator(
     regex=r"^#(?:[0-9a-fA-F]{3}){1,2}$",
     message="Color must be a hex value like #0d6efd or #abc.",
@@ -75,10 +74,11 @@ class Project(models.Model):
     def total_cost(self, since=None, until=None) -> Decimal | None:
         if self.hourly_rate is None:
             return None
-        return (self.total_hours(since=since, until=until) * self.hourly_rate).quantize(Decimal("0.01"))
+        total = self.total_hours(since=since, until=until) * self.hourly_rate
+        return total.quantize(Decimal("0.01"))
 
     @property
-    def active_timer(self) -> "TimeEntry | None":
+    def active_timer(self) -> TimeEntry | None:
         """Return the currently-running timer for this project, if any."""
         return self.entries.filter(end_time__isnull=True).order_by("-start_time").first()
 
@@ -104,6 +104,15 @@ class TimeEntry(models.Model):
     def __str__(self) -> str:
         return f"{self.project.name} · {self.date} · {self.duration_display}"
 
+    def save(self, *args, **kwargs):
+        # Auto-compute duration when both timestamps are set
+        if self.start_time and self.end_time:
+            delta: timedelta = self.end_time - self.start_time
+            self.duration_minutes = max(0, int(delta.total_seconds() // 60))
+            if not self.date:
+                self.date = timezone.localdate(self.start_time)
+        super().save(*args, **kwargs)
+
     @property
     def is_running(self) -> bool:
         return self.start_time is not None and self.end_time is None
@@ -124,12 +133,3 @@ class TimeEntry(models.Model):
     def clean(self):
         if self.start_time and self.end_time and self.end_time < self.start_time:
             raise ValidationError("End time must be after start time.")
-
-    def save(self, *args, **kwargs):
-        # Auto-compute duration when both timestamps are set
-        if self.start_time and self.end_time:
-            delta: timedelta = self.end_time - self.start_time
-            self.duration_minutes = max(0, int(delta.total_seconds() // 60))
-            if not self.date:
-                self.date = timezone.localdate(self.start_time)
-        super().save(*args, **kwargs)
