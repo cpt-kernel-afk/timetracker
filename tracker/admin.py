@@ -27,7 +27,7 @@ class ProjectAdmin(admin.ModelAdmin):
 
 @admin.register(TimeEntry)
 class TimeEntryAdmin(admin.ModelAdmin):
-    list_display = ("project", "date", "start_time", "end_time", "duration_minutes")
-    list_filter = ("project", "date")
+    list_display = ("project", "date", "status", "start_time", "end_time", "duration_minutes")
+    list_filter = ("project", "status", "date")
     search_fields = ("description",)
     date_hierarchy = "date"

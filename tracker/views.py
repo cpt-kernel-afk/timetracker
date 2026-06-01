@@ -73,12 +73,17 @@ def dashboard(request):
             "today_h": project.total_hours(since=today, until=today),
             "week_h": project.total_hours(since=week_start, until=today),
             "month_h": project.total_hours(since=month_start, until=today),
-            "active_timer": project.active_timer,
+            "open_entry": project.active_timer,
         })
 
-    running = TimeEntry.objects.filter(end_time__isnull=True).select_related("project")
+    running = TimeEntry.objects.filter(
+        status=TimeEntry.Status.RUNNING
+    ).select_related("project")
+    held = TimeEntry.objects.filter(
+        status=TimeEntry.Status.PAUSED
+    ).select_related("project")
     recent_entries = (
-        TimeEntry.objects.filter(end_time__isnull=False)
+        TimeEntry.objects.filter(status=TimeEntry.Status.COMPLETED)
         .select_related("project")
         .order_by("-date", "-end_time")[:10]
     )
@@ -86,6 +91,7 @@ def dashboard(request):
     return render(request, "tracker/dashboard.html", {
         "project_stats": project_stats,
         "running": running,
+        "held": held,
         "recent_entries": recent_entries,
         "today": today,
     })
@@ -215,18 +221,23 @@ def timeentry_delete(request, pk: int):
 @require_POST
 def timer_start(request, project_id: int):
     project = get_object_or_404(Project, pk=project_id, is_archived=False)
-    # Stop other running timers (single-concurrent-timer policy)
-    other_running = TimeEntry.objects.filter(end_time__isnull=True).exclude(project=project)
     now = timezone.now()
-    for r in other_running:
-        r.end_time = now
-        r.save()
-        messages.info(request, f"Stopped running timer on '{r.project.name}'.")
-    if not project.active_timer:
+    existing = project.active_timer
+    if existing:
+        # Resume the project's open session (auto-holds any other running timer).
+        existing.resume(when=now)
+        messages.success(request, f"Resumed timer for '{project.name}'.")
+    else:
+        # New session: hold any running timer, then start counting.
+        for other in TimeEntry.objects.filter(status=TimeEntry.Status.RUNNING):
+            other.pause(when=now)
+            messages.info(request, f"Paused running timer on '{other.project.name}'.")
         TimeEntry.objects.create(
             project=project,
             date=timezone.localdate(),
             start_time=now,
+            segment_started_at=now,
+            status=TimeEntry.Status.RUNNING,
             description=request.POST.get("description", ""),
         )
         messages.success(request, f"Timer started for '{project.name}'.")
@@ -235,11 +246,30 @@ def timer_start(request, project_id: int):
 
 @login_required
 @require_POST
+def timer_pause(request, entry_id: int):
+    entry = get_object_or_404(TimeEntry, pk=entry_id, status=TimeEntry.Status.RUNNING)
+    entry.pause()
+    messages.info(request, f"Timer for '{entry.project.name}' put on hold.")
+    return redirect(_safe_next(request))
+
+
+@login_required
+@require_POST
+def timer_resume(request, entry_id: int):
+    entry = get_object_or_404(TimeEntry, pk=entry_id, status=TimeEntry.Status.PAUSED)
+    entry.resume()
+    messages.success(request, f"Resumed timer for '{entry.project.name}'.")
+    return redirect(_safe_next(request))
+
+
+@login_required
+@require_POST
 def timer_stop(request, entry_id: int):
     entry = get_object_or_404(TimeEntry, pk=entry_id, end_time__isnull=True)
-    entry.end_time = timezone.now()
-    entry.description = request.POST.get("description", entry.description) or entry.description
-    entry.save()
+    description = request.POST.get("description", "")
+    if description:
+        entry.description = description
+    entry.stop()
     messages.success(request, f"Timer stopped — logged {entry.duration_display}.")
     return redirect(_safe_next(request))
 

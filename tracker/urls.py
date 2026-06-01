@@ -33,6 +33,8 @@ urlpatterns = [
     path("entries/<int:pk>/delete/", views.timeentry_delete, name="timeentry_delete"),
     # Live timer
     path("timer/start/<int:project_id>/", views.timer_start, name="timer_start"),
+    path("timer/pause/<int:entry_id>/", views.timer_pause, name="timer_pause"),
+    path("timer/resume/<int:entry_id>/", views.timer_resume, name="timer_resume"),
     path("timer/stop/<int:entry_id>/", views.timer_stop, name="timer_stop"),
     path("timer/cancel/<int:entry_id>/", views.timer_cancel, name="timer_cancel"),
     # Report
