@@ -84,7 +84,20 @@ class Project(models.Model):
 
 
 class TimeEntry(models.Model):
-    """A single time log entry against a project."""
+    """A single time log entry against a project.
+
+    A timer-managed entry is worked in one or more segments. ``status`` tracks
+    its lifecycle, ``accumulated_minutes`` holds the time from completed
+    segments, and ``segment_started_at`` marks the start of the currently
+    running segment (``None`` while paused). ``start_time`` is the first start,
+    ``end_time`` the final stop, and ``duration_minutes`` the worked total
+    (excluding paused gaps). At most one entry may be ``RUNNING`` at a time.
+    """
+
+    class Status(models.TextChoices):
+        RUNNING = "running", "Running"
+        PAUSED = "paused", "Paused"
+        COMPLETED = "completed", "Completed"
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="entries")
     date = models.DateField(default=timezone.localdate)
@@ -92,7 +105,21 @@ class TimeEntry(models.Model):
     end_time = models.DateTimeField(null=True, blank=True)
     duration_minutes = models.PositiveIntegerField(
         default=0,
-        help_text="Duration in minutes. Auto-calculated from start/end if both are set.",
+        help_text="Worked duration in minutes (excludes paused gaps).",
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.COMPLETED,
+    )
+    accumulated_minutes = models.PositiveIntegerField(
+        default=0,
+        help_text="Worked minutes from completed segments (before the live one).",
+    )
+    segment_started_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Start of the currently running segment; null while paused.",
     )
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -105,17 +132,68 @@ class TimeEntry(models.Model):
         return f"{self.project.name} · {self.date} · {self.duration_display}"
 
     def save(self, *args, **kwargs):
-        # Auto-compute duration when both timestamps are set
-        if self.start_time and self.end_time:
+        # Derive duration from the span only for simple entries that never used
+        # pause/resume. Timer-managed entries set duration_minutes in stop().
+        if self.start_time and self.end_time and self.accumulated_minutes == 0:
             delta: timedelta = self.end_time - self.start_time
             self.duration_minutes = max(0, int(delta.total_seconds() // 60))
             if not self.date:
                 self.date = timezone.localdate(self.start_time)
         super().save(*args, **kwargs)
 
+    # ----- Timer lifecycle -----
+
+    def _segment_minutes(self, when) -> int:
+        """Minutes elapsed in the currently running segment, if any."""
+        if not self.segment_started_at:
+            return 0
+        delta = when - self.segment_started_at
+        return max(0, int(delta.total_seconds() // 60))
+
+    def pause(self, when=None) -> None:
+        """Hold a running timer: bank the live segment, stop counting."""
+        if self.status != self.Status.RUNNING:
+            return
+        when = when or timezone.now()
+        self.accumulated_minutes += self._segment_minutes(when)
+        self.segment_started_at = None
+        self.status = self.Status.PAUSED
+        self.save(update_fields=["accumulated_minutes", "segment_started_at", "status"])
+
+    def resume(self, when=None) -> None:
+        """Make this the active timer, holding any other running one."""
+        when = when or timezone.now()
+        for other in TimeEntry.objects.filter(status=self.Status.RUNNING).exclude(pk=self.pk):
+            other.pause(when=when)
+        self.segment_started_at = when
+        self.status = self.Status.RUNNING
+        self.save(update_fields=["segment_started_at", "status"])
+
+    def stop(self, when=None) -> None:
+        """Finalize the session into a completed entry."""
+        when = when or timezone.now()
+        if self.status == self.Status.RUNNING:
+            self.accumulated_minutes += self._segment_minutes(when)
+            self.segment_started_at = None
+        self.end_time = when
+        self.duration_minutes = self.accumulated_minutes
+        self.status = self.Status.COMPLETED
+        self.save()
+
+    # ----- State helpers -----
+
     @property
     def is_running(self) -> bool:
-        return self.start_time is not None and self.end_time is None
+        return self.status == self.Status.RUNNING
+
+    @property
+    def is_paused(self) -> bool:
+        return self.status == self.Status.PAUSED
+
+    @property
+    def is_open(self) -> bool:
+        """Running or paused — an unfinished session shown on the dashboard."""
+        return self.status in (self.Status.RUNNING, self.Status.PAUSED)
 
     @property
     def duration_display(self) -> str:
@@ -124,10 +202,11 @@ class TimeEntry(models.Model):
         return f"{hours:d}h {mins:02d}m"
 
     def current_duration_minutes(self) -> int:
-        """Live duration: for running timers, returns minutes since start."""
-        if self.is_running and self.start_time:
-            delta = timezone.now() - self.start_time
-            return max(0, int(delta.total_seconds() // 60))
+        """Worked minutes so far: banked segments plus the live one if running."""
+        if self.status == self.Status.RUNNING:
+            return self.accumulated_minutes + self._segment_minutes(timezone.now())
+        if self.status == self.Status.PAUSED:
+            return self.accumulated_minutes
         return self.duration_minutes
 
     def clean(self):
