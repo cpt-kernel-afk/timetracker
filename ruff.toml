@@ -1,0 +1,19 @@
+# Ruff config for Time Tracker. See https://docs.astral.sh/ruff/
+target-version = "py312"
+line-length = 99
+indent-width = 4
+
+# Generated migrations don't need to follow all rules.
+extend-exclude = ["*/migrations/*", ".venv", "static"]
+
+[lint]
+# E/W: pycodestyle, F: pyflakes, I: isort, B: bugbear, UP: pyupgrade, DJ: flake8-django
+select = ["E", "W", "F", "I", "B", "UP", "DJ"]
+
+[lint.per-file-ignores]
+# Django settings legitimately use star imports and long lines.
+"config/settings.py" = ["E501", "F403", "F405"]
+
+[format]
+quote-style = "double"
+indent-style = "space"

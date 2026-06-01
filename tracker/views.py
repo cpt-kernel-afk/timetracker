@@ -30,7 +30,6 @@ from django.db.models import Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render, resolve_url
 from django.template.loader import render_to_string
-from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
@@ -38,7 +37,6 @@ from weasyprint import HTML
 
 from .forms import ProjectForm, ReportFilterForm, TimeEntryForm
 from .models import Project, TimeEntry
-
 
 # ---------- Helpers ----------
 
@@ -98,7 +96,9 @@ def dashboard(request):
 @login_required
 def project_list(request):
     show_archived = request.GET.get("archived") == "1"
-    projects = Project.objects.all() if show_archived else Project.objects.filter(is_archived=False)
+    projects = (
+        Project.objects.all() if show_archived else Project.objects.filter(is_archived=False)
+    )
     projects = projects.annotate(total_minutes_db=Sum("entries__duration_minutes"))
     return render(request, "tracker/project_list.html", {
         "projects": projects,
@@ -342,7 +342,17 @@ def report_csv(request):
     filename = f"timetracker-report-{timezone.localdate().isoformat()}.csv"
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     writer = csv.writer(response)
-    writer.writerow(["Project", "Date", "Start", "End", "Duration (minutes)", "Duration (hours)", "Description"])
+    writer.writerow(
+        [
+            "Project",
+            "Date",
+            "Start",
+            "End",
+            "Duration (minutes)",
+            "Duration (hours)",
+            "Description",
+        ]
+    )
     for block in context["project_blocks"]:
         for e in block["entries"]:
             hours = (Decimal(e.duration_minutes) / Decimal(60)).quantize(Decimal("0.01"))

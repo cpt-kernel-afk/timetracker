@@ -56,7 +56,9 @@ class ProjectModelTests(TestCase):
     def test_totals_aggregate_completed_entries(self):
         p = Project.objects.create(name="Sum", hourly_rate=Decimal("60.00"))
         now = timezone.now()
-        TimeEntry.objects.create(project=p, start_time=now - timedelta(hours=2), end_time=now, date=now.date())
+        TimeEntry.objects.create(
+            project=p, start_time=now - timedelta(hours=2), end_time=now, date=now.date()
+        )
         TimeEntry.objects.create(
             project=p,
             start_time=now - timedelta(minutes=30),
