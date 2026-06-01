@@ -17,9 +17,12 @@ up` away from running.
   marker and an optional hourly rate.
 - **Manual time entries** — pick a date, start and end time; duration is
   computed automatically.
-- **Live timer** — one-click start/stop on the dashboard, with a live JS counter
-  in the navbar. Only one timer runs at a time; starting a new one stops the
-  previous.
+- **Live timer with pause/hold** — start a timer on any project from the
+  dashboard, with a live JS counter. Only one timer runs at a time; starting or
+  resuming another automatically puts the running one **on hold** instead of
+  stopping it, so you can switch between projects with a single click and resume
+  later. Each timer has pause / resume / stop controls, and worked time is
+  tracked across segments (paused gaps are excluded).
 - **Dashboard** — today / this week / this month totals per project, plus the
   most recent entries.
 - **PDF report** — generated server-side with WeasyPrint. Filter by date range
@@ -98,9 +101,12 @@ full list of variables; the most important ones:
 ### Live timer
 
 From the dashboard, click **Start Timer** on any project card. The timer ticks
-live in the navbar; click **Stop & Save** to write the entry, or **Discard** to
-throw it away. Starting a timer on a different project automatically stops the
-running one.
+live; use **Pause** to put it on hold (it stops counting but stays open),
+**Resume** to continue, **Stop & Save** to write the entry, or **Discard** to
+throw it away. Starting or resuming a timer on another project automatically
+puts the currently running one on hold, so you can hop between projects with a
+single click. Held timers are listed in an **On hold** section on the
+dashboard; only one timer runs at a time.
 
 ### Manual entry
 
@@ -206,12 +212,18 @@ flow, redirect safety, and PDF/CSV report generation.
 
 - **Project**: `name` (unique), `description`, `color` (validated hex),
   `hourly_rate` (optional), `is_archived`, `created_at`
-- **TimeEntry**: `project` (FK, CASCADE), `date`, `start_time`, `end_time`,
-  `duration_minutes` (auto-calculated when both timestamps set),
-  `description`, `created_at`
+- **TimeEntry**: `project` (FK, CASCADE), `date`, `start_time` (first start),
+  `end_time` (final stop), `status` (`running` / `paused` / `completed`),
+  `accumulated_minutes` (worked time from completed segments),
+  `segment_started_at` (start of the live segment; `NULL` while paused),
+  `duration_minutes` (worked total, excludes paused gaps), `description`,
+  `created_at`
 
-A running live timer is simply a `TimeEntry` with `start_time` set and
-`end_time = NULL`.
+An open timer is a `TimeEntry` with `end_time = NULL` and a `status` of
+`running` or `paused`. While running, worked time is `accumulated_minutes` plus
+the live segment since `segment_started_at`; pausing banks the live segment
+into `accumulated_minutes`. Stopping writes the worked total into
+`duration_minutes`. At most one entry is `running` at a time.
 
 ## Troubleshooting
 
